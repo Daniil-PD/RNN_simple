@@ -1,5 +1,7 @@
 import torch
 
+
+
 class GatedRecurrentUnit(torch.nn.Module):
     def __init__(self, input_size, hidden_size):
         super().__init__()
