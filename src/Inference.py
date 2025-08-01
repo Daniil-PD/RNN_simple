@@ -5,6 +5,7 @@ import glob
 
 
 from models.gated_recurrent_unit import GatedRecurrentUnit
+from models.long_short_term_memory import LongShortTermMemory
 from lightning.lightning import LightningRNNOneHot
 
 
@@ -27,11 +28,12 @@ def main():
 
 
     MODULE = LightningRNNOneHot
-    model = MODULE(GatedRecurrentUnit(input_size, output_size))
+    model = MODULE(LongShortTermMemory(input_size, output_size))
 
-    ckpt_path = glob.glob("./lightning_logs/*/checkpoints/*.ckpt")[-1]
+    # ckpt_path = glob.glob("./lightning_logs/*/checkpoints/*.ckpt")[-1]
+    ckpt_path = r"C:\DEV\RNN_test\checkpoints\checkpoint_2025-08-01_14-52-20\bin_class\rnn-epoch=129-val_loss=35.496.ckpt"
     print("Loading model from {}".format(ckpt_path))
-    # ckpt_path = r"lightning_logs\version_22\checkpoints\epoch=9-step=3470.ckpt"
+    
     state_dict = torch.load(ckpt_path)["state_dict"]
     model.load_state_dict(state_dict)
 
@@ -43,7 +45,7 @@ def main():
 
 
     # print(encoder.decode(next(iter(pretrained_model.val_dataloader()))[1]))
-    my_data.generate(pretrained_model.model, encoder, 'ru', start_chars=[my_data.BOS]*20, max_length=20, temperature=0.2)
+    my_data.generate(pretrained_model.model, encoder, 'ru', start_chars=[my_data.BOS]*20, max_length=20, temperature=0.01)
 
     # while True:
     #     try:

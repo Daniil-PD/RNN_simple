@@ -5,6 +5,7 @@ __pycache__/
 
 samples/*
 lightning_logs/version*
+checkpoints/checkpoint*
 
 # C extensions
 *.so

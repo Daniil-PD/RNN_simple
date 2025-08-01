@@ -7,12 +7,13 @@ import matplotlib
 
 
 class LightningRNNOneHot(pl.LightningModule):
-    def __init__(self, model, learning_rate=1e-3, padding_index=0):
+    def __init__(self, model, learning_rate=1e-3, padding_index=0, teacher_forcing: float = 0 ):
         super().__init__()
         self.save_hyperparameters(ignore=['model'])
         self.model = model
         self.learning_rate = learning_rate
         self.padding_index = padding_index
+        self.teacher_forcing = teacher_forcing
         
 
     def training_step(self, batch, batch_idx):
@@ -21,9 +22,14 @@ class LightningRNNOneHot(pl.LightningModule):
         hidden = None
         for i in range(x.shape[1]):
             if hidden is None:
-                hidden = self.model.init_hidden(y.shape[0], batched=True).to(x.device)
+                hidden = self.model.init_hidden(y.shape[0], batched=True, device=self.device)
             else:    
-                hidden = torch.index_select(x, 1, torch.tensor(i-1).to(self.device)).permute(1, 0, 2)
+                try_hidden = torch.index_select(x, 1, torch.tensor(i-1).to(self.device)).permute(1, 0, 2) * self.teacher_forcing + \
+                    (hidden[1] if isinstance(hidden, tuple) else hidden) * (1 - self.teacher_forcing)
+                if isinstance(hidden, tuple):
+                    hidden = (try_hidden, hidden[1])
+                else:
+                    hidden = try_hidden
 
             x_select = torch.index_select(x, 1, torch.tensor(i).to(self.device)) # [batch_size, 1, input_size]
             y_select = torch.index_select(y, 1, torch.tensor(i).to(self.device)) # [batch_size, 1, input_size]
@@ -43,9 +49,13 @@ class LightningRNNOneHot(pl.LightningModule):
         hidden = None
         for i in range(x.shape[1]):
             if hidden is None:
-                hidden = self.model.init_hidden(y.shape[0], batched=True).to(x.device)
+                hidden = self.model.init_hidden(y.shape[0], batched=True, device=self.device)
             else:    
-                hidden = torch.index_select(x, 1, torch.tensor(i-1).to(self.device)).permute(1, 0, 2)
+                try_hidden = torch.index_select(x, 1, torch.tensor(i-1).to(self.device)).permute(1, 0, 2)
+                if isinstance(hidden, tuple):
+                    hidden = (try_hidden, hidden[1])
+                else:
+                    hidden = try_hidden
 
             x_select = torch.index_select(x, 1, torch.tensor(i).to(self.device))
             y_select = torch.index_select(y, 1, torch.tensor(i).to(self.device))

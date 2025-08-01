@@ -214,6 +214,7 @@ def generate_one(net,
         output = net.forward(last_token, hidden)
         # logger.debug("next prediction: '%s'", output.size())
         prediction, hidden = output
+        
         # Sample as a multinomial distribution
         # output_dist = prediction.ravel().div(temperature).exp()
         output_dist = torch.softmax(prediction.ravel().div(temperature), dim=0)
@@ -229,6 +230,7 @@ def generate_one(net,
             break
         else:
             chars_input = encoder.one_hot_chars(output_str[-1]).unsqueeze(0)
+            
 
     return output_str
 
