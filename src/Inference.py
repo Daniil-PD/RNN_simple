@@ -6,16 +6,13 @@ import glob
 
 from models.gated_recurrent_unit import GatedRecurrentUnit
 from models.long_short_term_memory import LongShortTermMemory
-from lightning.lightning import LightningRNNOneHot
+from lightning.LightningRNNOneHot import LightningRNNOneHot
 
 
 
 def main():
 
-
-
-
-    encoder, total_samples = my_data.load('data/*.txt')
+    encoder, total_samples = my_data.load('data/names/*.txt')
     train_samples, val_samples = np.split(total_samples,
                                           [int(.9 * len(total_samples))])
     # print("Total samples:{} = train:{}, valid:{}".format(
@@ -28,14 +25,27 @@ def main():
 
 
     MODULE = LightningRNNOneHot
-    model = MODULE(LongShortTermMemory(input_size, output_size))
+    
 
     # ckpt_path = glob.glob("./lightning_logs/*/checkpoints/*.ckpt")[-1]
-    ckpt_path = r"C:\DEV\RNN_test\checkpoints\checkpoint_2025-08-01_14-52-20\bin_class\rnn-epoch=129-val_loss=35.496.ckpt"
+    ckpt_path = r"checkpoints\checkpoint_2025-08-01_18-48-51\last.ckpt"
+    # ckpt_path = r"checkpoints\checkpoint_2025-08-01_18-05-21\last.ckpt"
+    # ckpt_path = r"checkpoints\checkpoint_2025-08-02_06-59-51\last.ckpt"
+    ckpt_path = r"checkpoints\checkpoint_2025-08-04_18-34-23\bin_class\rnn-epoch=074-val_loss=1240.830.ckpt"
+    
+    
     print("Loading model from {}".format(ckpt_path))
     
     state_dict = torch.load(ckpt_path)["state_dict"]
-    model.load_state_dict(state_dict)
+    print(state_dict.keys())
+    try:
+        model = MODULE(LongShortTermMemory(input_size, output_size))
+        model.load_state_dict(state_dict)
+        print("Loaded LongShortTermMemory")
+    except:
+        model = MODULE(GatedRecurrentUnit(input_size, output_size))
+        model.load_state_dict(state_dict)
+        print("Loaded GatedRecurrentUnit")
 
     pretrained_model = model
     
@@ -45,7 +55,7 @@ def main():
 
 
     # print(encoder.decode(next(iter(pretrained_model.val_dataloader()))[1]))
-    my_data.generate(pretrained_model.model, encoder, 'ru', start_chars=[my_data.BOS]*20, max_length=20, temperature=0.01)
+    my_data.generate(pretrained_model.model, encoder, 'ru', start_chars=[my_data.BOS]*10, max_length=300, temperature=0.2)
 
     # while True:
     #     try:

@@ -6,6 +6,7 @@ import copy
 
 import data as my_data
 from lightning.LightningRNNOneHot import LightningRNNOneHot
+from lightning.LightningRNNTimeSeries import LightningRNNTimeSeries_recursive
 from torch.utils.data import DataLoader
 from pytorch_lightning.loggers import MLFlowLogger
 
@@ -21,7 +22,8 @@ _MODELS_ARH_DICT_ = {
 }
 
 _MODELS_PYTORCH_LIGHTNING_DICT_ = {
-    "LightningRNNOneHot": LightningRNNOneHot
+    "LightningRNNOneHot": LightningRNNOneHot,
+    "LightningRNNTimeSeries": LightningRNNTimeSeries_recursive
 }
 
 def main(train_config):
@@ -37,31 +39,29 @@ def main(train_config):
     MODEL_PYTORCH_LIGHTNING = _MODELS_PYTORCH_LIGHTNING_DICT_[train_config["model_pytorch_lightning"]["type"]]
 
     # ----------------------- Подготовка данных -----------------------
-    encoder, total_samples = my_data.load(train_config["data_path"])
+    with torch.no_grad():
+        y = func(torch.arange(0, 300, 0.1))
+        total_samples = get_samples(y, train_config["window_size"], train_config["out_size"])
 
-    train_samples, val_samples = np.split(total_samples,
-                                            [int(.9 * len(total_samples))])
-    print("Total samples:{} = train:{}, valid:{}".format(
-        len(total_samples), len(train_samples), len(val_samples)))
-    del total_samples
+        train_samples = total_samples[:int(.9 * len(total_samples))]
+        val_samples = total_samples[int(.9 * len(total_samples)):]
+        print("Total samples:{} = train:{}, valid:{}".format(
+            len(total_samples), len(train_samples), len(val_samples)))
+        del total_samples
 
-    n_categories = len(encoder.all_categories)
-    input_size = len(encoder.all_letters)
-    output_size = len(encoder.all_letters)
 
-    train_dl = DataLoader(my_data.CityNamesOneHot(encoder, train_samples, device="cuda"),
+    train_dl = DataLoader(train_samples,
                             shuffle=True,
                             num_workers=6,
                             batch_size=train_config["batch_size"],
-                            collate_fn=my_data.pad_collate,
                             drop_last=True,
                             persistent_workers=True)
-    val_dl = DataLoader(my_data.CityNamesOneHot(encoder, val_samples, device="cuda"),
+    val_dl = DataLoader(val_samples,
                             shuffle=False,
-                            batch_size=1,
-                            collate_fn=my_data.pad_collate)
+                            batch_size=1)
     train_config["train_elements"] = len(train_samples)
     train_config["test_elements"] = len(val_samples)
+        
     
     
     # ----------------------- Подготовка модели -----------------------
@@ -70,7 +70,7 @@ def main(train_config):
     model = MODEL_PYTORCH_LIGHTNING(model_arh, 
                                     **train_config["model_pytorch_lightning"]["args"])
     
-    logger = MLFlowLogger(experiment_name=f"RNN-train_model", 
+    logger = MLFlowLogger(experiment_name=f"RNN-train_model_time_series", 
                       tags={"used_architecture": model.model.__class__.__name__}, 
                       tracking_uri="http://127.0.0.1:5000",
                       log_model=True,
@@ -82,7 +82,7 @@ def main(train_config):
     # ----------------------- Подготовка обучения -----------------------
     callbacks = [
         pl.callbacks.ModelCheckpoint(
-            dirpath=f'.\\checkpoints\\checkpoint_{start_time_train}',
+            dirpath=f'.\\checkpoints_time_series\\checkpoint_{start_time_train}',
             filename=r"bin_class\rnn-{epoch:03d}-{val_loss:.3f}", 
             monitor="val_loss",
             save_top_k=3,
@@ -130,21 +130,28 @@ def set_on_dict_path(in_dict, path: list, value):
         return
     set_on_dict_path(in_dict[path[0]], path[1:], value)
     
+def func(x):
+    y = np.sin(x)+np.sin(x*2-2.6)+np.sin(x*3)+np.sin(x*4-1.5)+np.random.normal(0, 0.1, len(x)).astype(np.float32)
+    return y
+
+def get_samples(y, window_size, outsize):
+    return [(y[i:i+window_size].view(window_size, 1), y[i+window_size:i+window_size+outsize].view(outsize, 1)) for i in range(len(y)-window_size-outsize)]
+
 if __name__ == "__main__":
     train_config = {
-        "model_architecture": {"type": "GatedRecurrentUnit", # "GatedRecurrentUnit", "LongShortTermMemory"
-                               "args": {"input_size": 166, "hidden_size": 166}},
-        "model_pytorch_lightning": {"type": "LightningRNNOneHot",
-                                    "args": {"learning_rate": 1e-4, 
-                                             "padding_index": my_data.PAD_ID,
+        "model_architecture": {"type": "LongShortTermMemory", # "GatedRecurrentUnit", "LongShortTermMemory"
+                               "args": {"input_size": 1, "hidden_size": 1}},
+        "model_pytorch_lightning": {"type": "LightningRNNTimeSeries",
+                                    "args": {"learning_rate": 1e-3, 
                                              "teacher_forcing": 0.1,
                                              }},
-        "batch_size": 16,
+        "batch_size": 32,
         "max_epochs": 150,
-        "data_path": "./data/WAR/*.txt",
+        "window_size": 75,
+        "out_size": 25 
     }
     test_config = {
-        "model_architecture/type": ["GatedRecurrentUnit", "LongShortTermMemory"],
+        # "model_architecture/type": ["GatedRecurrentUnit", "LongShortTermMemory"],
         # "model_pytorch_lightning/args/teacher_forcing": [0, 0.5, 0.8, 1],
         # "batch_size": [16, 32, 64],
         # "model_pytorch_lightning/args/learning_rate": [1e-4, 1e-5],

@@ -21,7 +21,7 @@ class GatedRecurrentUnit(torch.nn.Module):
         prediction, self.last_hidden = self.gru.forward(x, hidden)
         return prediction, self.last_hidden
     
-    def init_hidden(self, batch_size = 1, batched = False):
+    def init_hidden(self, batch_size = 1, batched = False, device = torch.device('cpu')):
         """
         Возвращает начальное скрытое состояние GRU
 
@@ -32,9 +32,9 @@ class GatedRecurrentUnit(torch.nn.Module):
 
         """
         if batched:
-            return torch.zeros(1, batch_size, self.gru.hidden_size)
+            return torch.zeros(1, batch_size, self.gru.hidden_size).to(device)
         else:
-            return torch.zeros(1, self.gru.hidden_size)
+            return torch.zeros(1, self.gru.hidden_size).to(device)
         
     def __str__(self):
         return "GatedRecurrentUnit(input_size={}, hidden_size={})".format(self.input_size, self.hidden_size)
